@@ -60,10 +60,8 @@ blr
     addis   \_A,      \_A,    ( (\_HASH >> 16) + ((\_HASH >> 15) & 1) )
 .endm
 
-# Bigger than 8000 since 8000 & 7fff == 0 && 8000 - 0 would overflow.
-# You want that bit to trickle over into the addis operation and leave the bottom one as is
 .macro  _addLO     _A,     _HASH
-.if   ( ( \_HASH & 0xffff ) > 0x8000 )
+.if   ( ( \_HASH & 0xffff ) >= 0x8000 )
     addi    \_A,      \_A,   -( 0x8000 - ( \_HASH & 0x7fff ) )
 .else
     addi    \_A,      \_A,    ( \_HASH & 0x7fff )
