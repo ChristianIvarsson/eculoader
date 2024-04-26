@@ -62,9 +62,9 @@ blr
 
 .macro  _addLO     _A,     _HASH
 .if   ( ( \_HASH & 0xffff ) >= 0x8000 )
-    addi    \_A,      \_A,   -( 0x8000 - ( \_HASH & 0x7fff ) )
+    addi    \_A,      \_A,    ( \_HASH & 0xffff ) - 0x10000
 .else
-    addi    \_A,      \_A,    ( \_HASH & 0x7fff )
+    addi    \_A,      \_A,    ( \_HASH & 0xffff )
 .endif
 .endm
 
