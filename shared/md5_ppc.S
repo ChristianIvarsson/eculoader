@@ -237,16 +237,15 @@ copyMore:
     add    bckC,     bckC,       kC
     add    bckD,     bckD,       kD
 
-
     addic. dCnt,     dCnt,      -64
     bne                    LoopOver
 
     # Saving A, B, C and D
 #   stswi  bckA,      dBase,       16 /* Causes a crash on this processor */
-    stw   bckA,  0( dBase )
-    stw   bckB,  4( dBase )
-    stw   bckC,  8( dBase )
-    stw   bckD, 12( dBase )
+    stw    bckA,  0( dBase )
+    stw    bckB,  4( dBase )
+    stw    bckC,  8( dBase )
+    stw    bckD, 12( dBase )
 
     # Restoring registers and stack
     lwz     %r0,           168( %sp )
