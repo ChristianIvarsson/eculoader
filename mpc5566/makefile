@@ -91,10 +91,10 @@ out/mainflash.o : mainloader/mainflash.c
 out/gmlan.o : ../shared/gmlan.c
 	@$(CC) $(CFLAGS) -c $< -o $@
 
-out/md5s.o : ../shared//md5ppc.S
+out/md5s.o : ../shared/md5_ppc.S
 	@$(CC) $(ASFLAGS) -c $< -o $@
 
-out/md5.o : ../shared//md5.c
+out/md5.o : ../shared/md5.c
 	@$(CC) $(CFLAGS) -c $< -o $@
 
 out/mainloader.elf : mainmessage out/mainloader.ld $(MAINOBJ)
