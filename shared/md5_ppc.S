@@ -35,12 +35,16 @@
 # Temporary registers
 .set tmpX    , 10
 .set tmpY    , 16
-
 .set tmpDat  , 17
+.set tmpCnt  , 20
+
+# Data destination buffer pointer
 .set bufPtr  , 18
+
+# Data source pointer
 .set srcPtr  , 19
 
-.set tmpCnt  , 20
+
 
 # Special version of the read function to save some space
 
