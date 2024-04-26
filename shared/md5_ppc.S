@@ -91,38 +91,38 @@ blr
 # FG hash
 .macro _FG     _A, _B, _C, _D, _X,     _IDX,     _HASH,     _ROT
 
-    _PRE   \_A,     \_IDX, \_HASH
+    _PRE    \_A,     \_IDX, \_HASH
 
     # F  = D ^ (B & (C ^ D))
     andc   tmpX,      \_D,      \_B
     and    tmpY,      \_C,      \_B
     or     tmpX,     tmpX,     tmpY
 
-    _POST  \_A, \_X,     \_HASH, \_ROT
+    _POST   \_A, \_X,     \_HASH, \_ROT
 .endm
 
 # H hash
 .macro __H     _A, _B, _C, _D, _X,     _IDX,     _HASH,     _ROT
 
-    _PRE   \_A,     \_IDX, \_HASH
+    _PRE    \_A,     \_IDX, \_HASH
 
     # F  = B ^ C ^ D
     xor    tmpX,      \_C,      \_D
     xor    tmpX,     tmpX,      \_B
 
-    _POST  \_A, \_X,     \_HASH, \_ROT
+    _POST   \_A, \_X,     \_HASH, \_ROT
 .endm
 
 # I hash
 .macro __I     _A, _B, _C, _D, _X,     _IDX,     _HASH,     _ROT
 
-    _PRE   \_A,     \_IDX, \_HASH
+    _PRE    \_A,     \_IDX, \_HASH
 
     # F  = C ^ (B | (~D))
     orc    tmpX,      \_B,      \_D
     xor    tmpX,     tmpX,      \_C
 
-    _POST  \_A, \_X,     \_HASH, \_ROT
+    _POST   \_A, \_X,     \_HASH, \_ROT
 .endm
 
 
