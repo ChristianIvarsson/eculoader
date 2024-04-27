@@ -217,20 +217,24 @@ bool canusb::openChannel(channelData & device)
     {
 
     case btr200k:
-        btrBits = 0x012f;
+        btrBits = (uint32_t)sja200k;
         break;
 
     case btr300k:
-        btrBits = 0x4215;
+        btrBits = (uint32_t)sja300k;
         break;
 
     case btr400k:
-        btrBits = 0x002f;
+        btrBits = (uint32_t)sja400k;
         break;
 
     case btr500k:
         predefBtr = true;
         btrBits = 6;
+        break;
+
+    case btr615k:
+        btrBits = (uint32_t)sja615k;
         break;
 
     default:

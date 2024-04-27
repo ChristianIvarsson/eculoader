@@ -131,41 +131,57 @@ void kvasOnCall(CanHandle hnd, void* context, unsigned int evt)
 
 bool kvaser::m_open(channelData device, int chan)
 {
-    unsigned long bitPerSec = 0;
-    unsigned int tseg1 = 0;
-    unsigned int tseg2 = 0;
-    unsigned int sjw   = 0;
-    unsigned int samp  = 0;
-    unsigned int syncm = 0;
+    int32_t btrBits = canBITRATE_500K;
 
-    switch(device.bitrate)
+    switch ( device.bitrate )
     {
-    case btr500k:
-        bitPerSec = canBITRATE_500K;
+    case btr200k:
+        btrBits = sja200k;
         break;
+
+    case btr300k:
+        btrBits = sja300k;
+        break;
+
     case btr400k:
-        bitPerSec = 400000;
-        tseg1 = 17 - 1;
-        tseg2 =  3;
-        samp = 3;
-        sjw = 2;
+        btrBits = sja400k;
         break;
+
+    case btr500k:
+        btrBits = canBITRATE_500K;
+        break;
+
+    case btr615k:
+        btrBits = sja615k;
+        break;
+
     default:
-        log(adapterlog, "Unknown bitrate");
+        log(adapterlog, "Unknown baud enum");
         return false;
     }
 
-    kvaserHandle = (int32_t)canOpenChannel(chan, 0);
-    if (kvaserHandle < 0)
+    if ( (kvaserHandle = (int32_t)canOpenChannel(chan, 0)) < 0 )
     {
         log(adapterlog, "Could not retrieve handle");
         return false;
     }
 
-    if (canSetBusParams(kvaserHandle, bitPerSec, tseg1, tseg2, sjw, samp, syncm) != canOK)
+    if ( btrBits < 0 )
     {
-        log(adapterlog, "Could not set bus parameters");
-        return false;
+        // Negative values are predefined
+        if ( canSetBusParams(kvaserHandle, btrBits, 0, 0, 0, 0, 0) != canOK )
+        {
+            log(adapterlog, "Could not set bus parameters");
+            return false;
+        }
+    }
+    else
+    {
+        if ( canSetBusParamsC200(kvaserHandle, (unsigned char)(btrBits >> 8), (unsigned char)btrBits) != canOK )
+        {
+            log(adapterlog, "Could not set bus parameters");
+            return false;
+        }
     }
 
     if (canBusOn(kvaserHandle) != canOK)

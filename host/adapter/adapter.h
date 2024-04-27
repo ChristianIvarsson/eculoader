@@ -9,6 +9,18 @@
 
 class adapterDesc;
 
+// 82c200 / sja1000 ( Kvaser, Lawicel canusb )
+// ( btr0 << 8 | btr1 )
+enum c200btrs : uint32_t
+{
+    sja33k     = 0x0b2f,    // ( SP 85.00%, SJW 1, Off  0.00% )   < Trionic 8, I-bus at 33.333.. >
+    sja47k     = 0x0b1a,    // ( SP 85.71%, SJW 1, Off  0.00% )   < Trionic 7, I-bus at 47.619.. >
+    sja200k    = 0x012f,    // ( SP 85.00%, SJW 1, Off  0.00% )
+    sja300k    = 0x4215,    // ( SP 77.78%, SJW 2, Off -1.23% )   !! WARN !!
+    sja400k    = 0x002f,    // ( SP 85.00%, SJW 1, Off  0.00% )
+    sja615k    = 0x0019,    // ( SP 84.62%, SJW 1, Off  0.00% )   < Trionic 5, P-bus at 615.384.. >
+};
+
 enum adaptertypes
 {
     adapterCanUsb, // Lawicel CANUSB
@@ -23,10 +35,11 @@ enum adapterPorts
 
 enum enBitrate
 {
-    btr500k,
-    btr400k,
-    btr300k,
     btr200k,
+    btr300k,
+    btr400k,
+    btr500k,
+    btr615k,
 };
 
 typedef struct {
