@@ -28,7 +28,8 @@ class fileManager {
 public:
     ~fileManager();
     fileHandle *open(std::string name);
-	void write(std::string name, uint8_t *, uint32_t);
+	void write(std::string name, uint8_t *, size_t);
+    void write(const char *name, uint8_t *, size_t);
 	void write(std::string name, std::string data);
 protected:
     void removeFileHandle(fileHandle*);

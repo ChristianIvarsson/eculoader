@@ -3,6 +3,9 @@
 
 #include "gmlan.h"
 
+// Default safe interframe delay
+#define GMLOADER_INTERFRAME ( 1200 )
+
 class gmloader : public gmlan
 {
 

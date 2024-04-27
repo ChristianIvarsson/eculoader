@@ -9,6 +9,15 @@
 using namespace std;
 using namespace logger;
 
+static string toString(const char* a) 
+{
+    string s = "";
+    while (*a)
+        s += *a++;
+
+    return s; 
+}
+
 fileManager::~fileManager()
 {
     fileHandle *fhandle;
@@ -82,7 +91,7 @@ fileHandle *fileManager::open(string name)
 }
 
 
-void fileManager::write(string name, uint8_t *buf, uint32_t len)
+void fileManager::write(string name, uint8_t *buf, size_t len)
 {
 	ofstream file(name, ofstream::binary | ofstream::trunc);
 
@@ -92,14 +101,37 @@ void fileManager::write(string name, uint8_t *buf, uint32_t len)
 		if (file.bad())
 		{
 			file.close();
-			log("Could not write file");
+			log(filemanager, "Could not write file");
 			return;
 		}
 		file.close();
+        log(filemanager, "Successfully wrote " + name);
 	}
 	else
     {
-		log("Could not write to: " + name);
+		log(filemanager, "Could not write to: " + name);
+    }
+}
+
+void fileManager::write(const char *name, uint8_t *buf, size_t len)
+{
+	ofstream file(name, ofstream::binary | ofstream::trunc);
+
+	if (file.is_open())
+	{
+		file.write((const char*)buf, len);
+		if (file.bad())
+		{
+			file.close();
+			log(filemanager, "Could not write file");
+			return;
+		}
+		file.close();
+        log(filemanager, "Successfully wrote " + toString( name ));
+	}
+	else
+    {
+		log(filemanager, "Could not write to: " + toString( name ));
     }
 }
 
@@ -113,13 +145,13 @@ void fileManager::write(string name, string data)
 		if (file.bad())
 		{
 			file.close();
-			log("Could not write file");
+			log(filemanager, "Could not write file");
 			return;
 		}
 		file.close();
 	}
 	else
-		log("Could not write to: " + name);
+		log(filemanager, "Could not write to: " + name);
 }
 
 fileHandle::fileHandle(fileManager *const parent, const std::string name, const int size, uint8_t *const data) :

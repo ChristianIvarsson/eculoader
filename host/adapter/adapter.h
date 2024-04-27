@@ -25,6 +25,7 @@ enum adaptertypes
 {
     adapterCanUsb, // Lawicel CANUSB
     adapterKvaser, // Various Kvaser devices
+    adapterUnknown,
 };
 
 enum adapterPorts

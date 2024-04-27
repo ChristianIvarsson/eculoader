@@ -11,8 +11,15 @@
 using namespace logger;
 using namespace timer;
 using namespace std;
-using namespace std::chrono;
 using namespace msgsys;
+
+// 0x40004000
+// 0x40002000
+#define LOADER_BASE   ( 0x40004000 )
+
+#define BAM_BLOB    "./loaderblobs/mpc5566_loader_bam.bin"
+#define LOADER_BLOB "../mpc5566/out/loader.bin"
+
 
 enum mpc5566Mode : uint32_t
 {
@@ -75,7 +82,7 @@ static void wU64Mgs(message_t *msg, uint64_t dat)
     }
 }
 
-bool e39::bamFlash(uint32_t address)
+bool e39::initSessionBAM()
 {
     message_t sMsg = newMessage(0x11, 8);
 
@@ -107,7 +114,7 @@ bool e39::bamFlash(uint32_t address)
     log(e39log, "Key accepted");
 
     fileManager fm;
-    fileHandle *file = fm.open("./loaderblobs/mpc5566_loader_bam.bin");
+    fileHandle *file = fm.open( BAM_BLOB );
 
     if (!file || file->size < (6 * 1024))
     {
@@ -125,7 +132,7 @@ bool e39::bamFlash(uint32_t address)
 
     memcpy(tmpBuf, file->data, file->size);
 
-    uint64_t cmd = lazySWAP((uint64_t)address << 32 | alignedSize);
+    uint64_t cmd = lazySWAP((uint64_t)LOADER_BASE << 32 | alignedSize);
     sMsg = newMessage(0x12, 8);
 
     wU64Mgs(&sMsg, cmd);
@@ -218,7 +225,7 @@ static void calculateKeyForE39(uint8_t *seed)
 
 bool e39::secAccE39(uint8_t lev)
 {
-    uint8_t buf[8] = {0x27, lev};
+    uint8_t buf[8] = { 0x27, lev };
 
     uint8_t *ret = sendRequest(buf, 2);
     if (ret == 0)
@@ -266,22 +273,11 @@ bool e39::secAccE39(uint8_t lev)
     return true;
 }
 
-/*
-7e8 E 017eaaaaaaaaaaaa     1,362
-7e0 H 053400001f200000   103,245
-7e8 E 037f3422aaaaaaaa     3,004
-*/
-
-
-
-
 bool e39::initSessionE39()
 {
     fileManager fm;
     string ident = "";
     uint8_t *tmp;
-
-
 
     testerPresent();
     sleepMS(20);
@@ -330,23 +326,15 @@ bool e39::initSessionE39()
 
         testerPresent();
 
-
-
         sleepMS( 100 );
 
-
-
-        fileHandle *file = fm.open("../mpc5566/out/loader.bin");
+        fileHandle *file = fm.open( LOADER_BLOB );
 
         if (!file || file->size < (6 * 1024))
         {
             log(e39log, "No file or too small");
             return false;
         }
-
-
-
-
 
         uint32_t alignedSize = (file->size + 15) & ~15;
         uint8_t *tmpBuf = new uint8_t[ alignedSize ];
@@ -377,7 +365,7 @@ bool e39::initSessionE39()
 
         testerPresent();
 
-        if (!transferData_32(tmpBuf, 0x40004000, alignedSize, 0x80, true))
+        if (!transferData_32(tmpBuf, LOADER_BASE, alignedSize, 0x80, true))
         {
             log(e39log, "Could not upload bootloader");
             delete[] tmpBuf;
@@ -390,64 +378,6 @@ bool e39::initSessionE39()
     else
     {
         log(e39log, "Bootloader already active");
-    }
-
-    return true;
-}
-
-///////////////////////////////////////////////////////////
-// e39a dump
-
-/*
-static key at    0x7C8
-static seed at   0x7D0
-
-SDA regs
-< Recovery >
-r13: 0x40021000
-
-< Main >
-r13: 0x40021000
-r14: 0x40001000
-r15: 0x40011000
-
-0x40015264 - secAccLocked     , byte
-0x40015259 - progModeEnabled  , byte
-
-< Blocked reads >
-400003a0
-400003b0
-400003c0
-400003d0
-400003e0
-400003f0
-40000400
-40000410
-40000420
-
-40000870
-40000880
-
-< Outright crashed while trying to read these >
-40007bc0
-40007bd0
-*/
-
-
-bool e39::getSecBytes(uint32_t secLockAddr, uint32_t progModeAddr)
-{
-    uint8_t *b;
-    
-    if ( (b = readMemoryByAddress_32_16(secLockAddr, 1, 1)) != nullptr )
-    {
-        log(e39log, "secLock: " + to_hex((volatile uint32_t)*b, 1));
-        delete[] b;
-    }
-
-    if ( (b = readMemoryByAddress_32_16(progModeAddr, 1, 1)) != nullptr )
-    {
-        log(e39log, "progMode: " + to_hex((volatile uint32_t)*b, 1));
-        delete[] b;
     }
 
     return true;
@@ -513,7 +443,7 @@ bool e39::initSessionE39A()
 
         sleepMS( 100 );
 
-        fileHandle *file = fm.open("../mpc5566/out/loader.bin");
+        fileHandle *file = fm.open( LOADER_BLOB );
 
         if (!file || file->size < (6 * 1024))
         {
@@ -532,15 +462,10 @@ bool e39::initSessionE39A()
         memcpy(tmpBuf, file->data, file->size);
 
         // Mine couldn't care less?
-/*
         tmpBuf[4] = modeE39A >> 24;
         tmpBuf[5] = modeE39A >> 16;
         tmpBuf[6] = modeE39A >> 8;
         tmpBuf[7] = modeE39A;
-*/
-
-        // Just to check if it returned states for some weird reason
-        getSecBytes( 0x40015264, 0x40015259 );
 
         log(e39log, "Uploading bootloader");
 
@@ -556,7 +481,7 @@ bool e39::initSessionE39A()
 
         testerPresent();
 
-        if (!transferData_32(tmpBuf, 0x40004000, alignedSize, 0x80, true))
+        if (!transferData_32(tmpBuf, LOADER_BASE, alignedSize, 0x80, true))
         {
             log(e39log, "Could not upload bootloader");
             delete[] tmpBuf;
@@ -574,120 +499,38 @@ bool e39::initSessionE39A()
     return true;
 }
 
-bool e39::play()
+bool e39::dump(const char *name, const ECU & target)
 {
-    testerPresent();
-    sleepMS(20);
-    testerPresent();
-    sleepMS(20);
-
-    InitiateDiagnosticOperation(3); // 10
-    sleepMS(10);
-
-    disableNormalCommunication(); // 28
-    sleepMS(10);
-
-    testerPresent();
-
-    if (!secAccE39(1))
-    {
-        log(e39log, "Could not gain security access");
-        return false;
-    }
-
-    testerPresent();
-    if (!ProgrammingMode(1))
-        return false;
-
-    // Won't give a response
-    ProgrammingMode(3);
-
-    testerPresent();
-
-
-    uint8_t *b;
-
-    if ( !InitiateDiagnosticOperation(2) ) // 10
-    {
-        log(e39log, "Init diag error");
-        return false;
-    }
-
-    sleepMS(10);
-
-    disableNormalCommunication(); // 28
-    sleepMS(100);
-
-    testerPresent();
-
-    // Not allowed to read more than 16 bytes per chunk on e39/a
-    const uint32_t chunkSz = 16;
-
-
-    const uint32_t agSz = 16;
-    uint32_t totLen = 128 * 1024;
-
-    uint32_t lenLeft = totLen;
-
-    uint32_t bufIdx = 0;
-    uint32_t rdAddr = 0x40000000;
-
-
-    uint8_t *buf = new uint8_t[ totLen ];
-
-    memset(buf, 0x00, totLen);
-
-    while ( lenLeft != 0 )
-    {
-        testerPresent();
-
-        // Not allowed to read more than 16 bytes in one go!
-        if ( (b = readMemoryByAddress_32_16(rdAddr, agSz, chunkSz)) != nullptr )
-        {
-            
-            memcpy(&buf[bufIdx], b, agSz);
-
-            delete[] b;
-        }
-        else
-        {
-            log(e39log, "Failed addres: " + to_hex(rdAddr, 4));
-        }
-
-        bufIdx += agSz;
-        rdAddr += agSz;
-        lenLeft -= agSz;
-
-    }
-
     fileManager fm;
-    fm.write("ramdump.bin", buf, totLen);
+    uint8_t *buffer;
+    bool retVal = false;
+    static const uint32_t nBytes = 0x300000 + 1024;
 
-    delete[] buf;
-
-    return false;
-}
-
-
-bool e39::dump()
-{
-    log(e39log, "Dump");
-
-
-    // bamFlash(0x40004000);
-    // return false;
+    log(e39log, "Dumping e39");
 
     configProtocol();
 
-    // play();
+    switch ( target )
+    {
+    case ecu_AcDelcoE39:
+        retVal = initSessionE39();
+        break;
+    case ecu_AcDelcoE39A:
+        retVal = initSessionE39A();
+        break;
+    case ecu_AcDelcoE39BAM:
+        log(e39log, "Can not init a dump session in BAM since the key must be known");
+        break;
+    default: break;
+    }
 
-    initSessionE39();
+    if ( retVal == false )
+    {
+        return false;
+    }
 
-
-
-    // Let's make it 256k - more than enough to verify basic functionality
-    // 0x300000
-    if (loader_StartRoutineById(0, 0, 0x40000))
+/*
+    if (loader_StartRoutineById(0, 0, nBytes))
     {
         uint8_t *dat;
         if ((dat = loader_requestRoutineResult(0)) != 0)
@@ -701,51 +544,30 @@ bool e39::dump()
             delete[] dat;
         }
     }
+*/
 
-    // newWriteDataById(0x91, new byte[] { (byte)(delay >> 8), (byte)delay });
-
-    uint32_t del = 250;
-    uint8_t byId[2] = { (uint8_t)(del >> 8), (uint8_t)del };
+    uint32_t InterFrame = GMLOADER_INTERFRAME;
+    uint8_t byId[2] = { (uint8_t)(InterFrame >> 8), (uint8_t)InterFrame };
 
     if (WriteDataByIdentifier(byId, 0x91, 2))
     {
         log(e39log, "Delay set ok");
     }
 
-    sleepMS(100);
-    uint8_t *dat;
-    auto timeStart = system_clock::now();
+    log(e39log, "Dumping");
 
-
-    // Let's make it 256k - more than enough to verify basic functionality
-    // 0x300000
-    if ((dat = loader_readMemoryByAddress(0, 0x40000, 245)) != 0)
+    if ( (buffer = loader_readMemoryByAddress(0, nBytes, 245)) == nullptr )
     {
-        log(e39log, "Data Read ok");
-        /*
-        string md5 = "";
-        for (uint32_t i = 0; i < 0x100; i++)
-        {
-            md5 += to_hex((volatile uint32_t)dat[i], 1);
-            if ((i & 15) == 15)
-            {
-                log(e39log, "Dat: " + md5);
-                md5 = "";
-            }
-        }
-        */
-        delete[] dat;
-    };
+        log(e39log, "Read failed");
+        returnToNormal();
+        return false;
+    }
 
-    uint64_t msTaken = duration_cast<milliseconds>(system_clock::now() - timeStart).count();
-    uint32_t secTaken = msTaken / 1000;
-    uint32_t minTaken = msTaken / 60000;
-    msTaken %= 1000;
-    secTaken %= 60;
+    log(e39log, "Dump ok");
 
-    log(e39log, "Duration " + to_string(minTaken) + "m, " + to_string(secTaken) + "s, " + to_string(msTaken) + "ms");
+    fm.write( name, buffer, nBytes );
 
-    sleepMS(2000);
+    delete[] buffer;
 
     returnToNormal();
 
