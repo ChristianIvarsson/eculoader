@@ -52,7 +52,6 @@ out/kvaser.o: adapter/kvaser/kvaser.cpp
 COMOBJS=\
 	$(ADAPTEROBJS) \
 	out/gmlan.o \
-	out/gmloader.o \
 	out/acdelco_e39.o
 
 out/gmlan.o: ecu/protocol/gmlan.cpp

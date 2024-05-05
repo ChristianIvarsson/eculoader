@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <iostream>
 #include <csignal>
 #include <cstdlib>
@@ -8,7 +9,6 @@
 
 using namespace logger;
 using namespace std;
-using namespace std::chrono;
 
 typedef bool cmdFunc(char *[], ECU & target);
 
@@ -19,14 +19,68 @@ typedef struct {
 } cmd_t;
 
 typedef struct {
-    const adaptertypes type;
     const char        *name;
+    const adaptertypes type;
 } adaptArg_t;
 
 typedef struct {
-    const ECU   type;
     const char *name;
+    const ECU   type;
 } targArg_t;
+
+static bool fncDumpEcu(char *argv[], ECU & target);
+
+// List of possible adapters
+static const adaptArg_t adaptArgs[] = {
+    { "canusb"    , adapterCanUsb     },
+    { "kvaser"    , adapterKvaser     }
+};
+
+// List of possible targets
+static const targArg_t targetArgs[] = {
+    {  "e39"      , ecu_AcDelcoE39    },
+};
+
+// List of possible operations
+static const cmd_t cmdArgs[] = {
+    { "--dump"    ,  1, fncDumpEcu    },
+};
+
+// Rework..
+class ecuSpace : public e39
+{};
+
+ecuSpace ecu;
+
+// TODO: Clean!
+
+// --dump command
+static bool fncDumpEcu(char *argv[], ECU & target)
+{
+    stopWatch sw;
+
+    bool retVal = false;
+
+    sw.capture();
+
+    switch ( target )
+    {
+    case ecu_AcDelcoE39:
+    case ecu_AcDelcoE39A:
+    case ecu_AcDelcoE39BAM:
+        retVal = ecu.e39::dump( argv[0], target );
+        break;
+    default:
+        printf("Error: Unknown dump target\n");
+        return false;
+    break;
+    }
+
+    sw.capture();
+    sw.print();
+
+    return retVal;
+}
 
 class parentlogger_t : public logger_t {
 public:
@@ -63,12 +117,6 @@ public:
 
 parentlogger_t parentlogger;
 
-// Rework..
-class ecuSpace : public e39
-{};
-
-ecuSpace ecu;
-
 static void exiting()
 {
     ecu.close();
@@ -92,64 +140,6 @@ static void prepMain()
     signal(SIGTERM, lam);
 
     loggerInstall( &parentlogger );
-}
-
-static bool fncDumpEcu(char *argv[], ECU & target);
-
-static const adaptArg_t adaptArgs[] = {
-    { adapterCanUsb    , "canusb"    },
-    { adapterKvaser    , "kvaser"    },
-};
-
-static const targArg_t targetArgs[] = {
-    { ecu_AcDelcoE39   , "e39"       },
-};
-
-static const cmd_t cmdArgs[] = {
-    { "--dump"     , 1, fncDumpEcu      },
-};
-
-static bool populateChannel(channelData & dat, const ECU & ecu)
-{
-    switch ( ecu )
-    {
-    case ecu_AcDelcoE39:
-        return e39::adapterConfig(dat, ecu);
-    default:
-        break;
-    }
-
-    printf("Error: Don't know how to load adapter parameters for this target!\n");
-    return false;
-}
-
-static bool fncDumpEcu(char *argv[], ECU & target)
-{
-    bool retVal = false;
-
-    auto timeStart = system_clock::now();
-
-    switch ( target )
-    {
-    case ecu_AcDelcoE39:
-    case ecu_AcDelcoE39A:
-    case ecu_AcDelcoE39BAM:
-        retVal = ecu.e39::dump( argv[0], target );
-        break;
-    default:
-        printf("Error: Unknown dump target\n");
-        return false;
-    break;
-    }
-
-    uint64_t msTaken = duration_cast<milliseconds>(system_clock::now() - timeStart).count();
-    uint32_t secTaken = (msTaken /  1000) % 60;
-    uint32_t minTaken = (msTaken / 60000) % 60;
-    msTaken %= 1000;
-
-    log("Duration " + to_string(minTaken) + "m, " + to_string(secTaken) + "s, " + to_string(msTaken) + "ms");
-
-    return retVal;
 }
 
 bool strMatch(const char *strA, const char *strB)
@@ -307,7 +297,7 @@ targetKnown:
     // Ugly. Implement index and detection based on constraints
     chDat.name = adapters.front();
 
-    if ( !populateChannel( chDat, target ) )
+    if ( !ecu_target::adapterConfig( chDat, target ) )
     {
         printf("Error: Could not load channel data\n");
         return 1;
@@ -358,26 +348,6 @@ targetKnown:
         printf("Error: Operation failed\n");
         return 1;
     }
-
-
-
-
-/*
-
-    channelData chDat;
-    chDat.name = adapters.front();
-    chDat.bitrate = btr500k;
-    chDat.canIDs = { 0x7e0, 0x7e8, 0x101, 0x011, 0x002, 0x003 };
-
-    if(! ecu.open( chDat ) )
-    {
-        log("Could not open");
-        return 1;
-    }
-
-    ecu.e39::dump();
-*/
-
 
     return 0;
 }

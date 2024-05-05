@@ -9,16 +9,32 @@
 
 class adapterDesc;
 
+#warning "Disassemble some bins and determine actual SP"
+// T5 is thought to be fetched from an actual bin - Verify
+
+
 // 82c200 / sja1000 ( Kvaser, Lawicel canusb )
 // ( btr0 << 8 | btr1 )
+// Devices at 16 MHz
 enum c200btrs : uint32_t
 {
-    sja33k     = 0x0b2f,    // ( SP 85.00%, SJW 1, Off  0.00% )   < Trionic 8, I-bus at 33.333.. >
-    sja47k     = 0x0b1a,    // ( SP 85.71%, SJW 1, Off  0.00% )   < Trionic 7, I-bus at 47.619.. >
-    sja200k    = 0x012f,    // ( SP 85.00%, SJW 1, Off  0.00% )
+    sja25k     = 0x0f4d,    // ( SP 75.00%, SNW 1             )
+    sja33k     = 0x0b4d,    // ( SP 75.00%, SJW 1             )   < Trionic 8, I-bus at 33.333..  >
+    sja47k     = 0x074e,    // ( SP 76.19%, SJW 1             )   < Trionic 7, I-bus at 47.619..  >
+    sja50k     = 0x074d,    // ( SP 75.00%, SNW 1             )
+    sja75k     = 0x453c,    // ( SP 77.78%, SJW 2, Off -1.23% )   !! WARN !!
+    sja100k    = 0x034d,    // ( SP 75.00%, SNW 1             )
+    sja125k    = 0x033a,    // ( SP 75.00%, SNW 1             )
+    sja150k    = 0x423c,    // ( SP 77.78%, SJW 2, Off -1.23% )   !! WARN !!
+    sja175k    = 0x415f,    // ( SP 73.91%, SJW 2, Off -0.62% )   !! WARN !!
+    sja200k    = 0x014d,    // ( SP 75.00%, SJW 1             )
+    sja250k    = 0x013a,    // ( SP 75.00%, SJW 1             )
     sja300k    = 0x4215,    // ( SP 77.78%, SJW 2, Off -1.23% )   !! WARN !!
-    sja400k    = 0x002f,    // ( SP 85.00%, SJW 1, Off  0.00% )
-    sja615k    = 0x0019,    // ( SP 84.62%, SJW 1, Off  0.00% )   < Trionic 5, P-bus at 615.384.. >
+    sja400k    = 0x004d,    // ( SP 75.00%, SJW 1             )
+    sja500k    = 0x003a,    // ( SP 75.00%, SJW 1             )   < Standard 500 kbit/s           >
+    sja615k    = 0x4037,    // ( SP 69.23%, SJW 2             )   < Trionic 5, P-bus at 615.384.. >
+    sja800k    = 0x0025,    // ( SP 70.00%, SJW 1             )
+    sja1000k   = 0x0014,    // ( SP 75.00%, SJW 1             )
 };
 
 enum adaptertypes

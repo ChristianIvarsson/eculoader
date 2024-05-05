@@ -5,6 +5,9 @@
 #include <sstream>
 #include <iostream>
 #include <iomanip>
+#include <mutex>
+#include <thread>
+#include <chrono>
 
 #include "file/file.h"
 #include "logger/logger.h"
@@ -64,5 +67,68 @@ std::string to_string_fcount(const T a_value, const int32_t n = 2)
     out << std::setfill('0') << std::setw(n) << a_value;
     return out.str();
 }
+
+typedef struct {
+    uint8_t  *dat;
+    size_t    len;
+} lzCompData_t;
+
+typedef struct {
+    const uint8_t *src;
+    uint8_t       *dst;
+    size_t         len;
+} lzData_t;
+
+class lzcomp
+{
+    // Implement ring buffer of variable size
+    volatile size_t index, count;
+    volatile bool threadAct;
+
+    volatile size_t queueSize;
+    lzData_t * volatile queue;
+
+    std::mutex mtx;
+
+public:
+    explicit lzcomp();
+    ~lzcomp();
+
+    // Push a request
+    bool push(lzData_t *src);
+
+    // The moment something has been popped, it's up to you to perform a delete[] on the returned compressed data.
+    // Unpopped data is cleaned automatically upon destruction, however
+    bool pop(lzData_t *src);
+
+    void flush();
+};
+
+class stopWatch
+{
+    std::chrono::time_point<std::chrono::system_clock> oldTime, newTime;
+
+public:
+    explicit stopWatch()
+    {
+        newTime = oldTime = std::chrono::system_clock::now();
+    }
+
+    void capture()
+    {
+        auto tempTime = std::chrono::system_clock::now();
+        oldTime = newTime;
+        newTime = tempTime;
+    }
+
+    void print()
+    {
+        uint64_t msTaken = std::chrono::duration_cast<std::chrono::milliseconds>(newTime - oldTime).count();
+        uint32_t secTaken = (msTaken /  1000) % 60;
+        uint32_t minTaken = (msTaken / 60000) % 60;
+        msTaken %= 1000;
+        logger::log("Duration " + std::to_string(minTaken) + "m, " + std::to_string(secTaken) + "s, " + std::to_string(msTaken) + "ms");
+    }
+};
 
 #endif

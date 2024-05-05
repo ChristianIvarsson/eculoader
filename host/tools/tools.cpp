@@ -109,3 +109,181 @@ bool openWrite( const char *fName, FILE **fp ) {
     rewind( *fp );
     return true;
 }
+
+// Do NOT change!
+#define LZ_MAX_OFFSET   ( 4096 )
+
+static inline uint32_t LZ_StringCompare(
+                            uint8_t *str1,
+                            uint8_t *str2,
+                            uint32_t minlen,
+                            uint32_t maxlen)
+{
+	for ( ; (minlen < maxlen) && (str1[minlen] == str2[minlen]); minlen++);
+	return minlen;
+}
+
+uint32_t LZ_Compress(uint8_t *in, uint8_t *out, int32_t insize)
+{
+	// Do we have anything to compress?
+	if ( insize == 0 )
+    {
+        log(lzcomplog, "Can't compress 0 bytes");
+		return 0;
+    }
+
+	// Start of compression
+	uint8_t *flags = out;
+	*flags = 0;
+	uint8_t mask = 0x80;
+
+	int32_t  bytesleft = insize;
+	int32_t  inpos = 0;
+	uint32_t outpos = 1;
+
+	// Main compression loop
+	do {
+		// Determine most distant position
+		uint32_t maxoffset = (inpos > LZ_MAX_OFFSET) ? LZ_MAX_OFFSET : inpos;
+
+		// Get pointer to current position
+		uint8_t *ptr1 = &in[ inpos ];
+
+		// Search history window for maximum length string match
+		uint32_t bestlength = 2;
+		uint32_t bestoffset = 0;
+
+		for ( uint32_t offset = 3; offset <= maxoffset; offset++ )
+		{
+			// Get pointer to candidate string
+			uint8_t *ptr2 = &ptr1[ -offset ];
+
+			// Quickly determine if this is a candidate (for speed)
+			if ( (ptr1[ 0 ] == ptr2[ 0 ] ) &&
+				 (ptr1[ bestlength ] == ptr2[ bestlength ]) )
+			{
+				// Determine maximum length for this offset
+				// Count maximum length match at this offset
+				uint32_t length = LZ_StringCompare( ptr1, ptr2, 0, ((inpos + 1) > 18 ? 18 : inpos + 1) );
+
+				// Better match than any previous match?
+				if ( length > bestlength )
+				{
+					bestlength = length;
+					bestoffset = offset;
+				}
+			}
+		}
+
+		// Was there a good enough match?
+		if ( bestlength > 2 )
+		{
+			*flags |= mask;
+
+			mask >>= 1;
+
+			out[ outpos++ ] = (bestlength - 3) << 4 | (((bestoffset - 1) & 0xF00) >> 8);
+			out[ outpos++ ] = (bestoffset - 1) & 0xFF;
+
+			inpos += bestlength;
+			bytesleft -= bestlength;
+
+			if ( mask == 0 )
+			{
+				mask = 0x80;
+				flags = &out[ outpos++ ];
+				*flags = 0;
+			}
+		}
+		else
+		{
+			mask >>= 1;
+			out[ outpos++ ] = in[ inpos++ ];
+			bytesleft--;
+
+			if ( mask == 0 )
+			{
+				mask = 0x80;
+				flags = &out[ outpos++ ];
+				*flags = 0;
+			}
+		}
+
+	} while ( bytesleft > 3 );
+
+	// Dump remaining bytes, if any
+	while ( inpos < insize )
+	{
+		mask >>= 1;
+		out[ outpos++ ] = in[ inpos++ ];
+
+		if ( mask == 0 )
+		{
+			mask = 0x80;
+			flags = &out[ outpos++ ];
+			*flags = 0;
+		}
+	}
+
+	while ( (outpos & 3) != 0 )
+    {
+		out[ outpos++ ] = 0;
+    }
+
+	return outpos;
+}
+
+lzcomp::lzcomp()
+{
+    log(lzcomplog, "lzcomp()");
+
+    index = count = 0;
+    threadAct = false;
+    queue = nullptr;
+    queueSize = 0;
+}
+
+lzcomp::~lzcomp()
+{
+	flush();
+
+	mtx.lock();
+
+	if ( queue != nullptr )
+	{
+		free( (void*)queue );
+		queue = nullptr;
+	}
+
+	mtx.unlock();
+}
+
+void lzcomp::flush()
+{
+	mtx.lock();
+
+	// -:stop worker:-
+	// ..
+	// ..
+
+	if ( queue != nullptr )
+	{
+		for ( size_t i = 0; i < count; i++ )
+		{
+			if ( queue[ ((index - 1) - i) % queueSize ].dst != nullptr )
+			{
+				delete[] queue[ ((index - 1) - i) % queueSize ].dst;
+			}
+		}
+
+		for ( size_t i = 0; i < queueSize; i++ )
+		{
+			queue[ i ].dst = nullptr;
+			queue[ i ].src = nullptr;
+		}
+
+		count = 0;
+	}
+
+	mtx.unlock();
+}

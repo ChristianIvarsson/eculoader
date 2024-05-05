@@ -20,6 +20,8 @@ using namespace msgsys;
 #define BAM_BLOB    "./loaderblobs/mpc5566_loader_bam.bin"
 #define LOADER_BLOB "../mpc5566/out/loader.bin"
 
+#define DUMP_SIZE  ( 0x300000 + 1024 )
+// #define DUMP_SIZE  ( 128 * 1024 )
 
 enum mpc5566Mode : uint32_t
 {
@@ -197,12 +199,17 @@ bool e39::initSessionBAM()
     return false;
 }
 
-// Calculated key e7f0 from seed a7a1
-
-static void calculateKeyForE39(uint8_t *seed)
+static bool calcSeedE39(uint8_t *seed, uint32_t seedLen)
 {
-    uint32_t _seed = seed[0] << 8 | seed[1];
-    uint32_t origSeed = _seed;
+    uint32_t _seed;
+
+    if ( seedLen != 2 )
+    {
+        log(e39log, "Seed of incorrect length");
+        return false;
+    }
+
+    _seed = (uint32_t)(seed[0] << 8 | seed[1]);
 
     if ( _seed != 0xffff )
     {
@@ -215,61 +222,9 @@ static void calculateKeyForE39(uint8_t *seed)
         _seed = 1;
     }
 
-    _seed &= 0xffff;
+    seed[0] = (uint8_t)(_seed >> 8);
+    seed[1] = (uint8_t)_seed;
 
-    log(e39log, "Calculated key " + to_hex(_seed, 2) + " from seed " + to_hex(origSeed, 2));
-
-    seed[0] = _seed >> 8;
-    seed[1] = _seed;
-}
-
-bool e39::secAccE39(uint8_t lev)
-{
-    uint8_t buf[8] = { 0x27, lev };
-
-    uint8_t *ret = sendRequest(buf, 2);
-    if (ret == 0)
-        return false;
-
-    uint16_t retLen = (ret[0] << 8 | ret[1]) + 2;
-
-    // 00 04 67 __ xx xx
-    if (retLen < 6 || ret[2] != 0x67 || ret[3] != lev)
-    {
-        delete[] ret;
-        return false;
-    }
-
-    if (ret[4] == 0 && ret[5] == 0)
-    {
-        log(e39log, "Already granted");
-        delete[] ret;
-        return true;
-    }
-    else
-    {
-        calculateKeyForE39( &ret[4] );
-    }
-
-    buf[0] = 0x27;
-    buf[1] = lev + 1;
-    buf[2] = ret[4];
-    buf[3] = ret[5];
-    delete[] ret;
-
-    ret = sendRequest(buf, 4);
-    if (ret == 0)
-        return false;
-    retLen = (ret[0] << 8 | ret[1]) + 2;
-
-    // 00 04 67 __ xx xx
-    if (retLen < 4 || ret[2] != 0x67 || ret[3] != (lev + 1))
-    {
-        delete[] ret;
-        return false;
-    }
-
-    delete[] ret;
     return true;
 }
 
@@ -298,7 +253,7 @@ bool e39::initSessionE39()
     {
         log(e39log, "Loader not active. Starting upload..");
 
-        if ( !InitiateDiagnosticOperation(3) ) // 10
+        if ( !InitiateDiagnosticOperation( enableDTCsDuringDevCntrl ) ) // 10
         {
             log(e39log, "initDiag error");
             return false;
@@ -311,18 +266,20 @@ bool e39::initSessionE39()
 
         testerPresent();
 
-        if (!secAccE39(1))
+        if (!securityAccess(1, calcSeedE39))
         {
             log(e39log, "Could not gain security access");
             return false;
         }
 
         testerPresent();
-        if (!ProgrammingMode(1))
+        if (!programmingMode( requestProgrammingMode ))
             return false;
 
         // Won't give a response
-        ProgrammingMode(3);
+        programmingMode( enableProgrammingMode, false);
+
+        sleepMS( 125 );
 
         testerPresent();
 
@@ -354,7 +311,7 @@ bool e39::initSessionE39()
         log(e39log, "Uploading bootloader");
 
         // The morons use a weird request without the format byte..
-        if (!requestDownload_24( alignedSize ))
+        if (!RequestDownload( alignedSize, gmSize24 ))
         {
             // The 39a log shows the ECU outright refusing but still accepting a transfer after. Weird fella..
 
@@ -365,7 +322,7 @@ bool e39::initSessionE39()
 
         testerPresent();
 
-        if (!transferData_32(tmpBuf, LOADER_BASE, alignedSize, 0x80, true))
+        if (!transferData(tmpBuf, LOADER_BASE, alignedSize, true, gmSize32))
         {
             log(e39log, "Could not upload bootloader");
             delete[] tmpBuf;
@@ -411,7 +368,7 @@ bool e39::initSessionE39A()
         log(e39log, "Loader not active. Starting upload..");
 
 // TODO: Investigate why it SOMETIMES wants this to be two
-        if ( !InitiateDiagnosticOperation(3) ) // 10
+        if ( !InitiateDiagnosticOperation( enableDTCsDuringDevCntrl ) ) // 10
         {
             log(e39log, "initDiag error");
             return false;
@@ -426,19 +383,21 @@ bool e39::initSessionE39A()
 
         testerPresent();
 
-        if (!secAccE39( 1 ))
+        if (!securityAccess(1, calcSeedE39))
         {
             log(e39log, "Could not gain security access");
             return false;
         }
 
         testerPresent();
-        if (!ProgrammingMode(1))
+        if (!programmingMode( requestProgrammingMode ))
             return false;
 
         // Won't give a response
-        ProgrammingMode(3);
+        programmingMode( enableProgrammingMode, false);
 
+        sleepMS( 125 );
+    
         testerPresent();
 
         sleepMS( 100 );
@@ -470,7 +429,7 @@ bool e39::initSessionE39A()
         log(e39log, "Uploading bootloader");
 
         // The morons use a weird request without the format byte..
-        if (!requestDownload_24( alignedSize ))
+        if (!RequestDownload( alignedSize, gmSize24 ))
         {
             // The 39a log shows the ECU outright refusing but still accepting a transfer after. Weird fella..
 
@@ -481,7 +440,7 @@ bool e39::initSessionE39A()
 
         testerPresent();
 
-        if (!transferData_32(tmpBuf, LOADER_BASE, alignedSize, 0x80, true))
+        if (!transferData(tmpBuf, LOADER_BASE, alignedSize, true, gmSize32))
         {
             log(e39log, "Could not upload bootloader");
             delete[] tmpBuf;
@@ -504,7 +463,7 @@ bool e39::dump(const char *name, const ECU & target)
     fileManager fm;
     uint8_t *buffer;
     bool retVal = false;
-    static const uint32_t nBytes = 0x300000 + 1024;
+    static const uint32_t nBytes = DUMP_SIZE;
 
     log(e39log, "Dumping e39");
 
@@ -545,16 +504,12 @@ bool e39::dump(const char *name, const ECU & target)
         }
     }
 */
-
-    uint32_t InterFrame = GMLOADER_INTERFRAME;
-    uint8_t byId[2] = { (uint8_t)(InterFrame >> 8), (uint8_t)InterFrame };
-
-    if (WriteDataByIdentifier(byId, 0x91, 2))
-    {
-        log(e39log, "Delay set ok");
-    }
+    // Every 1.2 ms is a nice safe value
+    setLoaderInterframe( 1200 );
 
     log(e39log, "Dumping");
+
+    shortAck = true;
 
     if ( (buffer = loader_readMemoryByAddress(0, nBytes, 245)) == nullptr )
     {
