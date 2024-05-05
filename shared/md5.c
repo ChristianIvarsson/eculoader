@@ -25,10 +25,6 @@ extern uint8_t __attribute__ ((noinline)) ReadData(uint32_t ptr);
 /////////////////////////////////////////////////////////////////
 // Code
 
-// Figure out byte offset within a dword
-#define horidswap(n) \
-    ((3 - (n & 3)) + (n & 60))
-
 // Perform a full byteswap of a Dword
 #define bs32(n) \
     ((n) << 24 | (( (n) >> 8) & 0xFF) << 16 | (((n) >> 16) & 0xFF) << 8 | (((n) >> 24) & 0xFF))
@@ -72,7 +68,7 @@ static void mdHash(md5k_t *m, uint32_t Start, uint32_t Length)
         D = m->d;
 
         for (uint32_t i = 0; i < 64; i++)
-            buf[horidswap(i)] = ReadData(Start++);
+            buf[ i ^ 3 ] = ReadData( Start++ );
 
         trnsf(FG, A, B, C, D, B, pntr[ 0], 0xd76aa478,  7)
         trnsf(FG, D, A, B, C, A, pntr[ 1], 0xe8c7b756, 12)
