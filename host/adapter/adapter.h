@@ -7,8 +7,6 @@
 #include <string>
 #include <list>
 
-class adapterDesc;
-
 #warning "Disassemble some bins and determine actual SP"
 // T5 is thought to be fetched from an actual bin - Verify
 
@@ -46,12 +44,13 @@ enum adaptertypes
 
 enum adapterPorts
 {
-    portCAN,
+    portCAN     = 0, // Port is of canbus type
     portKline
 };
 
 enum enBitrate
 {
+    btr10k,     // 10.4k k-line
     btr200k,
     btr300k,
     btr400k,
@@ -60,11 +59,11 @@ enum enBitrate
 };
 
 typedef struct {
-    std::string name;
-    std::list<uint32_t> canIDs;
-    enBitrate bitrate;
+    std::string         name;
+    std::list<uint64_t> idList;
+    enBitrate           bitrate;
+    adapterPorts        portType;
 } channelData;
-
 
 // Adapter class "template". Used "internally"
 class adapter_t
@@ -93,17 +92,5 @@ private:
 	bool setAdapter(adaptertypes &);
     adapter_t *adapterContext;
 };
-
-
-// Unique descriptor of an adapter
-class adapterDesc
-{
-public:
-	adaptertypes type;   // 
-	std::string  name;   // Adapter name. ie USBcan II, canusb, combiadapter etc
-	std::string  port;   // If an adapter has several ports of the same type, this one describes which one to use
-	std::string  serial; // Unique identifier
-};
-
 
 #endif

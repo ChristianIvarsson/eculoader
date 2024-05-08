@@ -3,23 +3,22 @@
 
 #include <cstdio>
 #include <mutex>
-//#include "adapter.h"
 
 namespace msgsys
 {
-	enum messagetypes
+	enum enMsgFlgs : uint32_t
 	{
-		messageRemote   = 0x40,
-		messageExtended = 0x80,
+		messageRemote   = ( 1UL << 6 ),
+		messageExtended = ( 1UL << 7 ),
 	};
 
-    typedef struct
-    {
+    typedef struct {
         uint64_t id;
         uint64_t timestamp;
         uint32_t typemask; // mask of "messagetypes" flags
         uint32_t length;
-        uint8_t  message[8]; // Way, way overkill atm.
+        // Data must be kept last due to how messages are copied
+        uint8_t  message[8];
     } message_t;
 
     message_t  newMessage(uint64_t id, uint32_t len);

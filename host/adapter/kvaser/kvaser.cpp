@@ -3,8 +3,6 @@
 #include <list>
 #include <iostream>
 
-// #include <usb.h>
-
 #include "kvaser.h"
 
 using namespace std;
@@ -59,7 +57,7 @@ bool kvaser::close()
 }
 
 
-bool kvaser::CalcAcceptanceFilters(list<uint32_t> idList) 
+bool kvaser::CalcAcceptanceFilters(list<uint64_t> &idList) 
 {
     unsigned int code = ~0;
     unsigned int mask = 0;
@@ -68,7 +66,7 @@ bool kvaser::CalcAcceptanceFilters(list<uint32_t> idList)
     {
         for (uint32_t canID : idList)
         {
-            // log(adapterlog, "Filter+ " + to_hex(canID));
+            log(adapterlog, "Filter+ " + to_hex(canID));
             if (canID == 0)
             {
                 log(adapterlog, "Found illegal id");
@@ -136,15 +134,15 @@ bool kvaser::m_open(channelData device, int chan)
     switch ( device.bitrate )
     {
     case btr200k:
-        btrBits = sja200k;
+        btrBits = (int32_t)sja200k;
         break;
 
     case btr300k:
-        btrBits = sja300k;
+        btrBits = (int32_t)sja300k;
         break;
 
     case btr400k:
-        btrBits = sja400k;
+        btrBits = (int32_t)sja400k;
         break;
 
     case btr500k:
@@ -152,7 +150,7 @@ bool kvaser::m_open(channelData device, int chan)
         break;
 
     case btr615k:
-        btrBits = sja615k;
+        btrBits = (int32_t)sja615k;
         break;
 
     default:
@@ -200,7 +198,7 @@ bool kvaser::m_open(channelData device, int chan)
         return false;
     }
 
-    return CalcAcceptanceFilters(device.canIDs);
+    return CalcAcceptanceFilters(device.idList);
 }
 
 bool kvaser::open(channelData & device)

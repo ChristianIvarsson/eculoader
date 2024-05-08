@@ -169,7 +169,9 @@ bool e39::initSessionBAM()
             wU64Mgs(&sMsg, cmd);
 
             setupWaitMessage(3);
-            sleepMS(4);
+
+            sleepMilli( 4 );
+
             if (!send(&sMsg))
             {
                 log(e39log, "Could not send!");
@@ -199,11 +201,11 @@ bool e39::initSessionBAM()
     return false;
 }
 
-static bool calcSeedE39(uint8_t *seed, uint32_t seedLen)
+static bool calcSeedE39(const uint8_t *seed, uint8_t *&key, uint32_t & length)
 {
     uint32_t _seed;
 
-    if ( seedLen != 2 )
+    if ( length != 2 )
     {
         log(e39log, "Seed of incorrect length");
         return false;
@@ -222,8 +224,10 @@ static bool calcSeedE39(uint8_t *seed, uint32_t seedLen)
         _seed = 1;
     }
 
-    seed[0] = (uint8_t)(_seed >> 8);
-    seed[1] = (uint8_t)_seed;
+    key = new uint8_t[ 2 ];
+
+    key[0] = (uint8_t)(_seed >> 8);
+    key[1] = (uint8_t)_seed;
 
     return true;
 }
@@ -235,9 +239,9 @@ bool e39::initSessionE39()
     uint8_t *tmp;
 
     testerPresent();
-    sleepMS(20);
+    sleepMilli( 20 );
     testerPresent();
-    sleepMS(20);
+    sleepMilli( 20 );
 
     log(e39log, "Checking loader state..");
 
@@ -259,10 +263,10 @@ bool e39::initSessionE39()
             return false;
         }
 
-        sleepMS(10);
+        sleepMilli( 10 );
 
         disableNormalCommunication(); // 28
-        sleepMS(10);
+        sleepMilli( 10 );
 
         testerPresent();
 
@@ -279,11 +283,11 @@ bool e39::initSessionE39()
         // Won't give a response
         programmingMode( enableProgrammingMode, false);
 
-        sleepMS( 125 );
+        sleepMilli( 125 );
 
         testerPresent();
 
-        sleepMS( 100 );
+        sleepMilli( 100 );
 
         fileHandle *file = fm.open( LOADER_BLOB );
 
@@ -349,9 +353,9 @@ bool e39::initSessionE39A()
 
 
     testerPresent();
-    sleepMS(20);
+    sleepMilli( 20 );
     testerPresent();
-    sleepMS(20);
+    sleepMilli( 20 );
 
     log(e39log, "Checking loader state..");
 
@@ -374,12 +378,12 @@ bool e39::initSessionE39A()
             return false;
         }
 
-        sleepMS(10);
+        sleepMilli( 10 );
 
-        sleepMS(10);
+        sleepMilli( 10 );
 
         disableNormalCommunication(); // 28
-        sleepMS(10);
+        sleepMilli( 10 );
 
         testerPresent();
 
@@ -396,11 +400,11 @@ bool e39::initSessionE39A()
         // Won't give a response
         programmingMode( enableProgrammingMode, false);
 
-        sleepMS( 125 );
+        sleepMilli( 125 );
     
         testerPresent();
 
-        sleepMS( 100 );
+        sleepMilli( 100 );
 
         fileHandle *file = fm.open( LOADER_BLOB );
 

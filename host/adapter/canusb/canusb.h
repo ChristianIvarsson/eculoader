@@ -17,16 +17,6 @@ extern "C"
 
 class canusb : public adapter_t
 {
-public:
-    explicit canusb();
-	~canusb();
-
-	std::list <std::string> adapterList();
-	bool                    open(channelData &);
-	bool                    close();
-    bool                    send(msgsys::message_t*);
-
-private:
 	FT_HANDLE                canusbContext = nullptr;
 
 	bool                     loadLibrary();
@@ -42,7 +32,17 @@ private:
     bool closeChannel();
 
     bool openChannel(channelData &);
-    bool CalcAcceptanceFilters(std::list <uint32_t>);
+    bool CalcAcceptanceFilters(std::list <uint64_t>&);
+
+public:
+    explicit canusb();
+	~canusb();
+
+	std::list <std::string> adapterList();
+	bool                    open(channelData &);
+	bool                    close();
+    bool                    send(msgsys::message_t*);
+
 };
 
 #endif

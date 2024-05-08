@@ -16,18 +16,19 @@ extern "C"
 
 class kvaser : public adapter_t
 {
+    bool CalcAcceptanceFilters(std::list<uint64_t>&) ;
+    bool m_open(channelData, int);
+    CanHandle kvaserHandle = -1;
+
 public:
     explicit kvaser();
     ~kvaser();
-    std::list <std::string> adapterList();
+
     bool open(channelData&);
     bool close();
     bool send(msgsys::message_t*);
-private:
-    bool CalcAcceptanceFilters(std::list<uint32_t>) ;
-    void messageThread(kvaser *);
-    bool m_open(channelData, int);
-    CanHandle kvaserHandle = -1;
+
+    std::list <std::string> adapterList();
 };
 
 #endif

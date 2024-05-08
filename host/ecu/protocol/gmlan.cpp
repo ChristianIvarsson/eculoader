@@ -11,19 +11,15 @@
 using namespace msgsys;
 using namespace logger;
 
-static void translateError(const uint8_t *msg, uint32_t len)
+
+
+void gmlan::translateError(const uint8_t *msg, uint32_t len)
 {
     std::string rdRequest, rdResponse;
 
     if ( msg[0] != 0x7f || len < 1 )
     {
         log(gmlanlog, "translateError() - That's not how to use this function!");
-        return;
-    }
-
-    if ( len < 3 )
-    {
-        log(gmlanlog, "Not enough data in response to translate error message");
         return;
     }
 
@@ -87,56 +83,6 @@ static void translateError(const uint8_t *msg, uint32_t len)
     }
 
     log(gmlanlog, rdRequest + " threw \"" + rdResponse + "\"");
-}
-
-// While it _CAN_ check lengths you're better off only using this to interpret responses that are already known to be wrong
-// If maxLen < minLen, minLen == exact len
-static bool reqOk(const uint8_t *resp, uint8_t req, uint32_t minLen = 0, uint32_t maxLen = 0)
-{
-    if ( minLen < 1 )
-    {
-        minLen = 1;
-    }
-
-    if ( maxLen < minLen )
-    {
-        maxLen = minLen;
-    }
-
-    if ( resp == nullptr )
-    {
-        log(gmlanlog, "No response");
-        return false;
-    }
-
-    uint32_t respLen = (uint32_t)(resp[0] << 8 | resp[1]);
-
-    // First boundary check. This is just for translate error
-    if ( respLen < 1 )
-    {
-        log(gmlanlog, "Response too short");
-        return false;
-    }
-
-    if ( resp[2] == 0x7f )
-    {
-        translateError( &resp[2], respLen );
-        return false;
-    }
-
-    if ( resp[2] != (req | 0x40) )
-    {
-        log(gmlanlog, "Target gave response to another request");
-        return false;
-    }
-
-    if ( respLen < minLen || respLen > maxLen )
-    {
-        log(gmlanlog, "Response length not correct");
-        return false;
-    }
-
-    return true;
 }
 
 void gmlan::setTesterID(uint64_t ID)
@@ -226,9 +172,7 @@ uint8_t *gmlan::sendRequest(uint8_t *req, uint32_t len, bool expectResponse)
     // Single frame
     if (len < 8)
     {
-        sMsg.message[0] = len;
-
-        memcpy(&sMsg.message[1], req, len);
+        memcpy(&sMsg.message[1], req, (sMsg.message[0] = len));
 
         setupWaitMessage(this->targetID);
 
@@ -256,19 +200,16 @@ uint8_t *gmlan::sendRequest(uint8_t *req, uint32_t len, bool expectResponse)
             return nullptr;
         }
 
-
         // 0: CTS - Continue to send
         // 1: WT  - Wait until next flow control
         // 2: OVF - Overflow
         // 3+ Not specified
-        rMsg = waitMessage( p2ct );
 
-        // Wait frame
-        while ( (rMsg->message[0] & 0xf3) == 0x31 )
-        {
+        // GoAhead / Wait frame
+        do {
             rMsg = waitMessage( p2ct );
-            // log(gmlanlog, "Transport wait..");
-        }
+            // -- Things like elm327 needs a pump here to keep the channel open --
+        } while ( (rMsg->message[0] & 0xf3) == 0x31 );
 
         // Catch overflow and unknown FS flags
         if ((rMsg->message[0] & 0xf3) != 0x30)
@@ -286,7 +227,7 @@ uint8_t *gmlan::sendRequest(uint8_t *req, uint32_t len, bool expectResponse)
         }
         else if (ST > 0xf0 && ST < 0xfa)
         {
-            ST = (ST&15) * 100; // microsec * 100
+            ST = (ST & 15) * 100; // microsec * 100
         }
         else
         {
@@ -297,13 +238,15 @@ uint8_t *gmlan::sendRequest(uint8_t *req, uint32_t len, bool expectResponse)
         // Consecutive sent frames before forced to wait for a new flow control
         uint32_t BS = rMsg->message[1];
 
-        if (BS > 0)
+        if ( BS > 0 )
         {
             log(gmlanlog, "BS is set. Implement!");
+            return nullptr;
         }
 
         // Message stepper
-        uint8_t stp = 0x21;
+        // 21 22 23.. 2f 20 21...
+        uint8_t stp = 0x20;
 
         while ( len > 0 )
         {
@@ -311,11 +254,10 @@ uint8_t *gmlan::sendRequest(uint8_t *req, uint32_t len, bool expectResponse)
 
             memcpy(&sMsg.message[1], req, thisCount);
 
+            sMsg.message[0] = (stp = ((stp+1) & 0x2f));
+
             req += thisCount;
             len -= thisCount;
-
-            sMsg.message[0] = stp++;
-            stp &= 0x2f;
 
             if ( len == 0 )
                 setupWaitMessage(this->targetID);
@@ -326,7 +268,7 @@ uint8_t *gmlan::sendRequest(uint8_t *req, uint32_t len, bool expectResponse)
                 return nullptr;
             }
 
-            if ( len > 0 )
+            if ( len > 0 && ST > 0 )
                 timer::sleepMicro( ST );
         }
     }
@@ -382,7 +324,7 @@ busyWait:
     if ((rMsg->message[0] & 0xf0) == 0x10)
     {
         // bytes, total to receive including the header
-        size_t toRec = ((rMsg->message[0] << 8 | rMsg->message[1]) & 0xfff) + 2;
+        size_t toRec = (msgLen(rMsg->message) & 0xfff) + 2;
 
         if (toRec <= 8)
         {
@@ -429,10 +371,8 @@ busyWait:
 
         return recdat;
     }
-    else
-    {
-        log(gmlanlog, "Unknown PCI");
-    }
+
+    log(gmlanlog, "Unknown PCI");
 
     return nullptr;
 }
@@ -445,7 +385,7 @@ bool gmlan::clearDiagnosticInformation()
     if ((ret = sendRequest(buf, 1)) == nullptr)
         return false;
 
-    if ((uint32_t)(ret[0] << 8 | ret[1]) < 1 || ret[2] != 0x44)
+    if (msgLen(ret) < 1 || ret[2] != 0x44)
     {
         delete[] ret;
         return false;
@@ -463,7 +403,7 @@ bool gmlan::InitiateDiagnosticOperation(enDiagOp mode)
     if ((ret = sendRequest(buf, 2)) == nullptr)
         return false;
 
-    if ((uint32_t)(ret[0] << 8 | ret[1]) < 1 || ret[2] != 0x50)
+    if (msgLen(ret) < 1 || ret[2] != 0x50)
     {
         delete[] ret;
         return false;
@@ -471,37 +411,6 @@ bool gmlan::InitiateDiagnosticOperation(enDiagOp mode)
 
     delete[] ret;
     return true;
-}
-
-// 1a
-uint8_t *gmlan::ReadDataByIdentifier(uint8_t id)
-{
-    uint8_t *ret, buf[ 2 ] = { 0x1a, id };
-
-    if ((ret = sendRequest(buf, 2)) == nullptr)
-        return nullptr;
-
-    uint16_t retLen = (ret[0] << 8 | ret[1]) + 2;
-
-#warning "Clean me!"
-    if (retLen < 5 ||  ret[2] != 0x5a || ret[3] != id)
-    {
-        delete[] ret;
-        return nullptr;
-    }
-
-    retLen-=4;
-    ret[0] = (retLen>>8);
-    ret[1] = (retLen);
-    retLen += 2;
-
-    for (uint32_t i = 2; i < retLen; i++)
-        ret[i] = ret[i + 2];
-
-    ret[retLen] = 0;
-    ret[retLen+1] = 0;
-
-    return ret;
 }
 
 // 20
@@ -512,7 +421,7 @@ bool gmlan::returnToNormal()
     if ((ret = sendRequest(buf, 1)) == nullptr)
         return false;
 
-    if ((uint32_t)(ret[0] << 8 | ret[1]) < 1 || ret[2] != 0x60)
+    if (msgLen(ret) < 1 || ret[2] != 0x60)
     {
         delete[] ret;
         return false;
@@ -572,7 +481,7 @@ uint8_t *gmlan::readMemoryByAddress(
             return nullptr;
         }
 
-        if ( (uint32_t)(ret[0] << 8 | ret[1]) != (thisLen + addrLen + 1) )
+        if ( msgLen(ret) != (thisLen + addrLen + 1) )
         {
             log(gmlanlog, "Target did not respond with the expected length");
             delete[] ret;
@@ -622,146 +531,6 @@ uint8_t *gmlan::readMemoryByAddress(
     }
 
     return dataBuf;
-}
-
-// 27
-bool gmlan::securityAccess(uint32_t lev, keyFunc_t & keyFunc)
-{
-    uint8_t *ret, buf[ 8 ] = { 0x27, (uint8_t)lev };
-
-    log(gmlanlog, "Requesting security access");
-
-    if ( (ret = sendRequest(buf, 2)) == nullptr )
-    {
-        log(gmlanlog, "No response to securityAccess");
-        return false;
-    }
-
-    // Check if responding to our request, status and length
-    if ( !reqOk(ret, 0x27, 2, 4095) )
-    {
-        delete[] ret;
-        return false;
-    }
-
-    if ( ret[3] != (uint8_t)lev )
-    {
-        log(gmlanlog, "securityAccess did not respond to the correct level");
-
-        delete[] ret;
-        return false;
-    }
-
-
-    uint32_t retLen = (uint32_t)(ret[0] << 8 | ret[1]);
-
-    // Unlikely scenario - Received OK response with nothing else than level
-    if ( retLen == 2 )
-    {
-        log(gmlanlog, "Received OK with no additional data. Suspect..");
-
-        delete[] ret;
-        return true;
-    }
-
-    // Translate to seed length
-    retLen -= 2;
-    bool respZero = true;
-
-    for (uint32_t i = 0; i < retLen; i++)
-    {
-        if ( ret[4 + i] != 0 )
-        {
-            respZero = false;
-            break;
-        }
-    }
-
-    if ( respZero )
-    {
-        log(gmlanlog, "Security access already granted");
-
-        delete[] ret;
-        return true;
-    }
-
-    // Convert seed to string
-    std::string seedStr;
-    for (uint32_t i = 0; i < retLen; i++)
-        seedStr += to_hex((volatile uint32_t)ret[i + 4], 1);
-
-    // Call key calc func
-    if ( !keyFunc(&ret[4], retLen) )
-    {
-        log(gmlanlog, "securityAccess keygen returned a fault");
-
-        delete[] ret;
-        return false;
-    }
-
-    // Convert key to string
-    std::string keyStr;
-    for (uint32_t i = 0; i < retLen; i++)
-        keyStr += to_hex((volatile uint32_t)ret[i + 4], 1);
-
-    log(gmlanlog, "Seed " + seedStr);
-    log(gmlanlog, "Key  " + keyStr);
-
-    uint8_t *req2 = new uint8_t[ retLen + 2 ];
-
-    req2[ 0 ] = 0x27;
-    req2[ 1 ] = (uint8_t)lev + 1;
-
-    memcpy(&req2[2], &ret[4], retLen);
-
-    // Old returned buffer is no longer of any use
-    delete[] ret;
-
-
-
-
-
-
-    if ( (ret = sendRequest(req2, retLen + 2)) == nullptr )
-    {
-        log(gmlanlog, "No response to securityAccess key");
-
-        delete[] req2;
-        return false;
-    }
-
-    delete[] req2;
-
-
-    // Check if responding to our request, status and length
-    if ( !reqOk(ret, 0x27, 2, 4095) )
-    {
-        delete[] ret;
-        return false;
-    }
-
-    // Expect 27 | 40 (OK)
-    if ( ret[2] != 0x67 )
-    {
-        // We already know it'll fail so ignore response of this.
-        reqOk(ret, 0x27);
-
-        delete[] ret;
-        return false;
-    }
-
-    // Expect level + 1 in the response
-    if ( ret[3] != (uint8_t)(lev + 1) )
-    {
-        log(gmlanlog, "securityAccess did not respond to the correct key level");
-
-        delete[] ret;
-        return false;
-    }
-
-
-    delete[] ret;
-    return true;
 }
 
 
@@ -848,7 +617,7 @@ bool gmlan::RequestDownload(
     if ((ret = sendRequest(buf, sizeLen + 2)) == nullptr)
         return false;
 
-    if ((uint32_t)(ret[0] << 8 | ret[1]) < 1 || ret[2] != 0x74)
+    if (msgLen(ret) < 1 || ret[2] != 0x74)
     {
         delete[] ret;
         return false;
@@ -909,7 +678,7 @@ bool gmlan::transferData(
         }
 
         // 00 xx 76
-        if ((uint32_t)(ret[0] << 8 | ret[1])  < 1 || ret[2] != 0x76)
+        if (msgLen(ret) < 1 || ret[2] != 0x76)
         {
             log(gmlanlog, "Received fail");
             delete[] ret;
@@ -945,7 +714,7 @@ bool gmlan::transferData(
         }
 
         // 00 xx 76
-        if ((uint32_t)(ret[0] << 8 | ret[1])  < 1 || ret[2] != 0x76)
+        if (msgLen(ret) < 1 || ret[2] != 0x76)
         {
             log(gmlanlog, "Received fail");
             delete[] ret;
@@ -957,38 +726,6 @@ bool gmlan::transferData(
 
     return true;
 }
-
-// 3b
-bool gmlan::WriteDataByIdentifier(const uint8_t *dat, uint8_t id, uint32_t len)
-{
-#warning "Clean me!"
-    uint8_t *ret, buf[256 + 2] = { 0x3b, id };
-
-    if (len > 256)
-        return false;
-
-    if (dat)
-        memcpy(&buf[2], dat, len);
-    else
-        memset(&buf[2], 0  , len);
-
-    if ((ret = sendRequest(buf, len + 2)) == nullptr)
-        return false;
-
-    // 20202020202020202020
-    // 00 02 7b __ xx xx
-    if ((uint32_t)(ret[0] << 8 | ret[1]) < 2 || ret[2] != 0x7b || ret[3] != id)
-    {
-        delete[] ret;
-        return false;
-    }
-
-    // log(gmlanlog, "Succ??");
-
-    delete[] ret;
-    return true;
-}
-
 
 #warning "Mend"
 
@@ -1052,7 +789,7 @@ bool gmlan::ReportProgrammedState()
     }
 
     // 00 02 e2 <st>
-    if ((uint32_t)(ret[0] << 8 | ret[1])  < 2 || ret[2] != 0xe2)
+    if (msgLen(ret) < 2 || ret[2] != 0xe2)
     {
         log(gmlanlog, "Could not retrieve programmed state");
         delete[] ret;
@@ -1097,7 +834,7 @@ bool gmlan::programmingMode(enProgOp lev, bool expectResponse)
         }
 
         // 00 01 e5 ..?
-        if ((uint32_t)(ret[0] << 8 | ret[1]) < 1 || ret[2] != 0xE5)
+        if (msgLen(ret) < 1 || ret[2] != 0xE5)
         {
             log(gmlanlog, "Retrieved unexpected response to programmingMode");
 
@@ -1118,7 +855,7 @@ bool gmlan::programmingMode(enProgOp lev, bool expectResponse)
         }
 
         // 00 01 e5 ..?
-        if ((uint32_t)(ret[0] << 8 | ret[1]) < 1 || ret[2] != 0xE5)
+        if (msgLen(ret) < 1 || ret[2] != 0xE5)
         {
             log(gmlanlog, "Retrieved unexpected response to programmingMode");
             delete[] ret;
@@ -1146,7 +883,7 @@ bool gmlan::DeviceControl(const uint8_t *dat, uint8_t id, uint8_t len)
     if ((ret = sendRequest(buf, len + 2)) == nullptr)
         return false;
 
-    if ((uint32_t)(ret[0] << 8 | ret[1]) < 1 || ret[2] != 0xee)
+    if (msgLen(ret) < 1 || ret[2] != 0xee)
     {
         delete[] ret;
         return false;

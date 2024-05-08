@@ -98,7 +98,7 @@ bool adapter::open(channelData & device)
 
 	if ( adapterContext->open(device) )
 	{
-        sleepMS(1000);
+        sleepMilli( 1000 );
 		return true;
 	}
 

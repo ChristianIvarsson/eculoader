@@ -217,15 +217,15 @@ bool canusb::openChannel(channelData & device)
     {
 
     case btr200k:
-        btrBits = (uint32_t)sja200k;
+        btrBits = sja200k;
         break;
 
     case btr300k:
-        btrBits = (uint32_t)sja300k;
+        btrBits = sja300k;
         break;
 
     case btr400k:
-        btrBits = (uint32_t)sja400k;
+        btrBits = sja400k;
         break;
 
     case btr500k:
@@ -234,7 +234,7 @@ bool canusb::openChannel(channelData & device)
         break;
 
     case btr615k:
-        btrBits = (uint32_t)sja615k;
+        btrBits = sja615k;
         break;
 
     default:
@@ -272,7 +272,7 @@ bool canusb::openChannel(channelData & device)
         return false;
     }
 
-    if (!CalcAcceptanceFilters(device.canIDs))
+    if (!CalcAcceptanceFilters(device.idList))
     {
         log(adapterlog, "Couldn't set can filters");
         return false;
@@ -284,7 +284,7 @@ bool canusb::openChannel(channelData & device)
     return  (FT_Write(canusbContext, buf, 2, &retLen) == FT_OK) ? true : false;
 }
 
-bool canusb::CalcAcceptanceFilters(list<uint32_t> idList)
+bool canusb::CalcAcceptanceFilters(list<uint64_t> & idList)
 {
     uint32_t code = ~0;
     uint32_t mask = 0;
@@ -341,15 +341,6 @@ list<string> canusb::adapterList()
 
     return findCANUSB();
 }
-
-// CAN Frame
-typedef struct {
-  unsigned long id;         // Message id
-  unsigned long timestamp;  // timestamp in milliseconds
-  unsigned char flags;      // [extended_id|1][RTR:1][reserver:6]
-  unsigned char len;        // Frame size (0.8)
-  unsigned char data[8];    // Databytes 0..7
-} CANMsg;
 
 bool canusb::send(message_t *msg)
 {
@@ -466,7 +457,6 @@ static inline void canusbToCanMsg(char *p, message_t *msg)
     }
 
     *(p + data_offset + 2 * msg->length) = save;
-    msg->timestamp = 0;
 
     // Not remote frame
     if (!(msg->typemask & messageRemote))
@@ -476,7 +466,11 @@ static inline void canusbToCanMsg(char *p, message_t *msg)
         {
             p[data_offset + 2 * (msg->length) + 4] = 0;
             sscanf((p + data_offset + 2 * (msg->length)), "%x", &val);
-            msg->timestamp = (uint8_t)val;
+            msg->timestamp = val;
+        }
+        else
+        {
+            msg->timestamp = std::chrono::duration_cast< std::chrono::microseconds >(std::chrono::system_clock::now().time_since_epoch()).count() % 1000000;
         }
     }
 
@@ -488,6 +482,10 @@ static inline void canusbToCanMsg(char *p, message_t *msg)
             p[data_offset + 4] = 0;
             sscanf((p + data_offset), "%x", &val);
             msg->timestamp = val;
+        }
+        else
+        {
+            msg->timestamp = std::chrono::duration_cast< std::chrono::microseconds >(std::chrono::system_clock::now().time_since_epoch()).count() % 1000000;
         }
     }
 

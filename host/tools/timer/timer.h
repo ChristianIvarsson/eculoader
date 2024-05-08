@@ -6,7 +6,7 @@
 
 namespace timer
 {
-    void sleepMS(const uint32_t msTime);
+    void sleepMilli(const uint32_t msTime);
     void sleepMicro(const uint32_t uTime);
 }
 

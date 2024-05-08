@@ -172,7 +172,7 @@ public:
                 delete[] ret;
             }
 
-            timer::sleepMS(25);
+            timer::sleepMilli(25);
         }
 
         return nullptr;

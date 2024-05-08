@@ -9,6 +9,7 @@ namespace logger
         lzcomplog     ,
         filemanager   ,
         e39log        ,
+        gmsharedlog   ,
         gmlanlog      ,
         adapterlog    ,
     };
