@@ -18,7 +18,8 @@ public:
     ~e39();
 
     // Overrides of target.h / ecu_target {}
-    bool dump(const char *name, const ECU & target);
+    bool dump  (const char *name, const ECU & target);
+    bool flash (const char *name, const ECU & target);
 };
 
 #endif

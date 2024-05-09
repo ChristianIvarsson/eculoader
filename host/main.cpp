@@ -28,7 +28,8 @@ typedef struct {
     const ECU   type;
 } targArg_t;
 
-static bool fncDumpEcu(char *argv[], ECU & target);
+static bool fncDumpEcu   (char *argv[], ECU & target);
+static bool fncFlashEcu  (char *argv[], ECU & target);
 
 // List of possible adapters
 static const adaptArg_t adaptArgs[] = {
@@ -44,6 +45,7 @@ static const targArg_t targetArgs[] = {
 // List of possible operations
 static const cmd_t cmdArgs[] = {
     { "--dump"    ,  1, fncDumpEcu    },
+    { "--flash"   ,  1, fncFlashEcu   },
 };
 
 // Rework..
@@ -69,6 +71,34 @@ static bool fncDumpEcu(char *argv[], ECU & target)
     case ecu_AcDelcoE39A:
     case ecu_AcDelcoE39BAM:
         retVal = ecu.e39::dump( argv[0], target );
+        break;
+    default:
+        printf("Error: Unknown dump target\n");
+        return false;
+    break;
+    }
+
+    sw.capture();
+    sw.print();
+
+    return retVal;
+}
+
+// --flash command
+static bool fncFlashEcu(char *argv[], ECU & target)
+{
+    stopWatch sw;
+
+    bool retVal = false;
+
+    sw.capture();
+
+    switch ( target )
+    {
+    case ecu_AcDelcoE39:
+    case ecu_AcDelcoE39A:
+    case ecu_AcDelcoE39BAM:
+        retVal = ecu.e39::flash( argv[0], target );
         break;
     default:
         printf("Error: Unknown dump target\n");
@@ -132,7 +162,6 @@ static void prepMain()
     auto lam = [] (int i)
     {
         exiting();
-        exit(1);
     };
 
     signal(SIGINT, lam);
@@ -159,6 +188,62 @@ bool strMatch(const char *strA, const char *strB)
     return ( strA[ strIdx ] == strB[ strIdx ] );
 }
 
+
+#define testSize  (8192 * 1024)
+void lzTest()
+{
+    lzcomp lz;
+
+    printf("Testing Lz..\n");
+
+    uint8_t *tmp = new uint8_t[ testSize ];
+    for (size_t i = 0; i < testSize; i++)
+    {
+        tmp[ i ] = (uint8_t)i; // (uint8_t)rand();
+    }
+
+    // memset(tmp, 0, testSize / 2);
+
+    int32_t ticket = lz.push( tmp, testSize );
+
+
+    if ( ticket < 0 )
+    {
+        printf("Lz dafuq?!\n");
+        exit( 1 );
+    }
+
+    lzData_t popDat = lz.get( ticket );
+
+    if ( popDat.data == nullptr )
+    {
+        printf("Null data!\n");
+        exit( 1 );
+    }
+
+    // delete[] popDat.data;
+
+    lz.flush();
+
+    ticket = lz.push( tmp, testSize );
+
+    if ( ticket < 0 )
+    {
+        printf("Lz dafuq?!\n");
+        exit( 1 );
+    }
+
+    popDat = lz.get( ticket );
+
+    if ( popDat.data == nullptr )
+    {
+        printf("Null data!\n");
+        exit( 1 );
+    }
+
+    timer::sleepMilli( 4000 );
+}
+
 int main(int argc, char *argv[])
 {
     string adapterList = "";
@@ -166,6 +251,8 @@ int main(int argc, char *argv[])
     channelData chDat;
 
     prepMain();
+
+    // lzTest();
 
     if ( argc < 2 )
     {

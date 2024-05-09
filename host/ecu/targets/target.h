@@ -13,7 +13,8 @@ class ecu_target
 {
 
 public:
-    virtual bool dump(const char *name, const ECU & target) = 0;
+    virtual bool dump  (const char *name, const ECU & target) = 0;
+    virtual bool flash (const char *name, const ECU & target) = 0;
 
     // This may seem weird but it's annoying to reimplement this for every target. Let's have one central point for it
     static bool adapterConfig(channelData & dat, const ECU & ecu)

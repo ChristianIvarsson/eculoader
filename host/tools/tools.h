@@ -5,6 +5,7 @@
 #include <sstream>
 #include <iostream>
 #include <iomanip>
+#include <condition_variable>
 #include <mutex>
 #include <thread>
 #include <chrono>
@@ -13,6 +14,9 @@
 #include "logger/logger.h"
 #include "timer/timer.h"
 #include "checksum/checksum.h"
+#include "checksum/md5.h"
+#include "partition_helper.h"
+
 #include "typedef.h"
 
 extern std::string toString(const char* a);
@@ -25,10 +29,8 @@ extern u32 asc2u32(const char *ptr);
 extern size_t openRead( const char *fName, FILE **fp );
 extern bool openWrite( const char *fName, FILE **fp );
 
-// Because, F*CK C++..
-// They can not hande 1-byte integers for some weird reason!
 template< typename T >
-std::string to_hex( T i )
+std::string to_hex(T i)
 {
     std::stringstream stream;
     stream << std::hex << std::setfill ('0') << std::setw(sizeof(T)*2) << i;
@@ -36,7 +38,7 @@ std::string to_hex( T i )
 }
 
 template< typename T >
-std::string to_hex( T i, uint32_t size)
+std::string to_hex(T i, uint32_t size)
 {
     std::stringstream stream;
     if (size) stream << std::hex << std::setfill ('0') << std::setw(size*2) << i;
@@ -45,7 +47,7 @@ std::string to_hex( T i, uint32_t size)
 }
 
 template< typename T >
-std::string to_hex24( T i)
+std::string to_hex24(T i)
 {
     std::stringstream stream;
     stream << std::hex << std::setfill ('0') << std::setw(6) << i;
@@ -53,7 +55,7 @@ std::string to_hex24( T i)
 }
 
 template< typename T >
-std::string to_hex12( T i)
+std::string to_hex12(T i)
 {
     std::stringstream stream;
     stream << std::hex << std::setfill ('0') << std::setw(3) << i;
@@ -69,37 +71,86 @@ std::string to_string_fcount(const T a_value, const int32_t n = 2)
 }
 
 typedef struct {
-    uint8_t  *dat;
-    size_t    len;
-} lzCompData_t;
-
-typedef struct {
-    const uint8_t *src;
-    uint8_t       *dst;
-    size_t         len;
+    uint8_t *data;
+    size_t   length;
 } lzData_t;
 
 class lzcomp
 {
-    // Implement ring buffer of variable size
-    volatile size_t index, count;
-    volatile bool threadAct;
+    typedef struct {
+        lzData_t buffer;
+        lzData_t lzData;
+        int32_t  token;
+    } lzQeueData_t;
 
-    volatile size_t queueSize;
-    lzData_t * volatile queue;
+    class lz_queue
+    {
+        std::mutex mtx;
+        volatile size_t count;
+        volatile size_t size;
+        volatile lzQeueData_t * volatile queue;
 
-    std::mutex mtx;
+        bool isPresent(int32_t token);
+
+        uint32_t tokenCntr;
+
+    public:
+        explicit lz_queue()
+        {
+            size = count = 0;
+            tokenCntr = 0;
+            queue = nullptr;
+        }
+
+        ~lz_queue()
+        {
+            printf("queue death\n");
+        }
+
+        void nuke();
+        void flush();
+
+        bool push(uint8_t *, const size_t &, int32_t &);
+        bool popLz(volatile bool &, lzData_t &, const int32_t &);
+        bool getLz(volatile bool &, lzData_t &, const int32_t &);
+
+        // Get first item where lsData has not yet been set
+        bool waiting(lzQeueData_t &);
+        // Update item with lzdata.
+        bool update(const lzQeueData_t &, uint8_t *, const size_t &);
+    };
+
+    lz_queue reqQueue;
+
+    // Compress thread
+    std::mutex mtxThread;
+    std::condition_variable threadCondition;
+    volatile bool runThread;
+    std::thread tFunc;
+
+    bool startThread();
+    bool stopThread();
+    void pumpThread();
+    void lzThread();
+
+    std::mutex intMtx;
 
 public:
     explicit lzcomp();
     ~lzcomp();
 
     // Push a request
-    bool push(lzData_t *src);
+    // Returned value:
+    // >= 0 Token
+    // < 0 Error
+    int32_t push(const uint8_t *dat, size_t length);
 
     // The moment something has been popped, it's up to you to perform a delete[] on the returned compressed data.
-    // Unpopped data is cleaned automatically upon destruction, however
-    bool pop(lzData_t *src);
+    // Unpopped data is cleaned automatically upon destruction, however.
+    lzData_t pop(int32_t token);
+
+    // Retrieve data for block but keep it in the queue
+    lzData_t get(int32_t token);
 
     void flush();
 };

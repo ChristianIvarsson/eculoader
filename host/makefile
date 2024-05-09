@@ -7,11 +7,12 @@ endif
 
 APP=testapp
 
-CXXFLAGS=-Wall -std=c++11 -m64
+CXXFLAGS=-Wall -std=c++11 -O1
 
 # This section needs some mending. Believed to only function on windows.. barely at that
 ifeq ($(OS),Windows_NT)
 LDFLAGS= -m64  -Llibs -lftd2xx -Llibs/kvaser/lib/x64 -lcanlib32
+CXXFLAGS+= -m64
 else
 LDFLAGS=-Llibs -lftd2xx_x64 -lcanlib -lusb -lpthread
 endif

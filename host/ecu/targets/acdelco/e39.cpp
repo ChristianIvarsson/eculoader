@@ -1,12 +1,11 @@
 
+#include <cstring>
+
 #include "acdelco.h"
 
 #include "../../../adapter/message.h"
 
 #include "../../../tools/tools.h"
-
-
-#include <cstring>
 
 using namespace logger;
 using namespace timer;
@@ -21,7 +20,7 @@ using namespace msgsys;
 #define LOADER_BLOB "../mpc5566/out/loader.bin"
 
 #define DUMP_SIZE  ( 0x300000 + 1024 )
-// #define DUMP_SIZE  ( 128 * 1024 )
+// #define DUMP_SIZE   ( 128 * 1024 )
 
 enum mpc5566Mode : uint32_t
 {
@@ -529,6 +528,70 @@ bool e39::dump(const char *name, const ECU & target)
     delete[] buffer;
 
     returnToNormal();
+
+    return true;
+}
+
+
+bool e39::flash(const char *name, const ECU & target)
+{
+    fileManager fm;
+    fileHandle *fl;
+    bool retVal = false;
+    static const uint32_t nBytes = 0x300000 + 1024;
+
+    log(e39log, "Flashing e39");
+
+    if ( (fl = fm.open(name)) == nullptr )
+    {
+        log(e39log, "Could not open file for reading");
+        return false;
+    }
+
+    // Accept files with and without shadow info
+    if ( fl->size != (0x300000 + 1024) && fl->size != (0x300000) )
+    {
+        log(e39log, "File is not of the correct size");
+        return false;
+    }
+
+    return false;
+
+
+
+    configProtocol();
+
+    switch ( target )
+    {
+    case ecu_AcDelcoE39:
+        retVal = initSessionE39();
+        break;
+    case ecu_AcDelcoE39A:
+        retVal = initSessionE39A();
+        break;
+    case ecu_AcDelcoE39BAM:
+        log(e39log, "Implement me!");
+        break;
+    default: break;
+    }
+
+    if ( retVal == false )
+    {
+        return false;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     return true;
 }

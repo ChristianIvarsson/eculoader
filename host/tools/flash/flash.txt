@@ -1,0 +1,15 @@
+Todo list of sorts
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# 29 series chips
+
+MAN       ID             MID   DID       SIZE x W      SECT        TYPE
+
+WINBOND   W29C020        00DA  0045      256k x 8      C U S T     paged toggle (128 byte/p)
+
+
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# 39 series chips
+
+MAN       ID             MID   DID       SIZE x W      SECT        TYPE

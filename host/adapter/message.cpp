@@ -33,12 +33,12 @@ static volatile uint32_t   inQueue = 0; // How many queued messages. 0 to qCOUNT
 static message_t           messageQueue[ qCOUNT ];
 static volatile uint64_t   WaitMessageID = ~0;
 
-// TODO: Actualyl use the mutex?
+// TODO: Actually use the mutex?
 pthread_mutex_t    mtxCond = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t     timedCond;
 pthread_condattr_t attr;
 
-static inline void printMessageContents(string what, message_t *msg)
+static void printMessageContents(string what, message_t *msg)
 {
     string strResp = what + ": ";
 
@@ -73,12 +73,9 @@ static message_t *popMessage()
 
 message_t newMessage(uint64_t id, uint32_t len)
 {
-    message_t msg = {0};
+    message_t msg = { 0 };
     msg.id = id;
     msg.length = len;
-
-    // memset(&msg.message, 0, len);
-
     return msg;
 }
 
@@ -113,8 +110,6 @@ void setupWaitMessage(uint64_t id)
 }
 
 
-// This thing is a resource hog!!
-// Complete notifiers...
 message_t *waitMessage(uint32_t waitms)
 {
     static message_t nullMessage;
@@ -148,19 +143,7 @@ void messageReceive(message_t *msg)
 
     message_t *qmsg = &messageQueue[inPos++];
 	inPos &= (qCOUNT-1);
-/*
-    qmsg->id        = msg->id;
 
-    // canusb is using a serial protocol, ie SLOW as all heck, so adapter timestamps can't be used..
-    // ..Maybe it's better just to use local host time in that case?
-    qmsg->timestamp = 0; // Implement something useful here..
-
-    qmsg->typemask  = msg->typemask;
-    qmsg->length    = msg->length;
-    memcpy(qmsg->message, msg->message, msg->length);
-*/
-
-    // Enough yapping..
     memcpy( qmsg, msg, (sizeof(message_t) - sizeof(msg->message)) + msg->length );
 
     if ( msg->length < sizeof(msg->message) )
@@ -174,7 +157,7 @@ void messageReceive(message_t *msg)
         inQueue++;
     }
 
-    // Buffer is full; The oldest message pointed to by outPos has been overwritten.
+    // Buffer is full; The oldest message pointed at by outPos has been overwritten.
     // Update pointer to the next oldest message
     else
     {
